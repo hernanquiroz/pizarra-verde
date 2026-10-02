@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧮 Pizarra Interactiva</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;overflow:hidden;
+  background:#141210;color:#f4f1e6;font-family:'Nunito',sans-serif}
+button{cursor:pointer;border:none;border-radius:10px;font-family:inherit;
+  font-weight:700;color:#1c1a17;transition:transform .06s}
+button:active{transform:scale(.95)}
+.activo,.activa{outline:3px solid #ffd75e;outline-offset:1px}
+
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:10px 16px;background:#1d1a17;border-bottom:2px solid #2c2823}
+h1{margin:0;font-size:1.4rem;font-family:'Patrick Hand',cursive;letter-spacing:.5px}
+.formulas{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-items:center}
+.chip{padding:4px 12px;border-radius:20px;font-size:1.02rem;background:#26332b;border:1.5px solid}
+.chip.rojo{border-color:#ff6b6b;color:#ffb3b3}
+.chip.azul{border-color:#5bc0ff;color:#bfe4ff}
+.chip.apagada{opacity:.35}
+.chip.usr{border-style:dashed;background:#26221c;display:inline-flex;align-items:center;gap:6px}
+.chip.usr .quitar{background:none;border:none;color:inherit;cursor:pointer;
+  font-size:.75rem;padding:0;font-weight:700}
+#chipsUsuario{display:inline-flex;gap:8px;flex-wrap:wrap}
+
+#barraRecon{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:6px 16px;background:#191612;border-bottom:2px solid #2c2823}
+#barraRecon[hidden]{display:none}
+#txtRecon{font-family:'Patrick Hand',cursive;font-size:1.35rem;color:#f4f1e6;
+  min-width:220px;min-height:1.6em;outline:none;border-bottom:1px dashed #5a544a;padding:0 6px}
+#txtRecon:empty::before{content:'✍️ escribe una ecuación…';opacity:.45}
+#varsRecon{font-size:.75rem;color:#9dffb0;white-space:nowrap}
+#fbRecon{font-size:.75rem;color:#bdb6a6;flex:1;min-width:120px}
+#barraRecon button{background:#efe6d2;padding:4px 12px;font-size:.85rem}
+
+main{flex:1;display:flex;gap:12px;padding:12px;min-height:0}
+#marco{flex:1;display:flex;min-width:0;padding:14px;border-radius:16px;
+  background:linear-gradient(160deg,#9a6b3f,#6d4526,#8a5a33);
+  box-shadow:0 10px 30px rgba(0,0,0,.55), inset 0 0 0 2px rgba(0,0,0,.25)}
+#pizarron{position:relative;flex:1;border-radius:8px;overflow:hidden;
+  background:#1b3427;box-shadow:inset 0 0 40px rgba(0,0,0,.45)}
+#pizarra{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
+#v3d{position:absolute;inset:0}
+#v3d canvas{display:block;touch-action:none}
+#pista{position:absolute;left:14px;bottom:10px;pointer-events:none;
+  font-family:'Patrick Hand',cursive;font-size:1.05rem;color:rgba(244,241,230,.75);
+  text-shadow:0 1px 2px rgba(0,0,0,.5)}
+
+aside{width:215px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.grupo-modos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.modo{padding:10px 6px;font-size:.85rem}
+.modo:nth-child(1){background:#ffe08a}.modo:nth-child(2){background:#ff9d9d}
+.modo:nth-child(3){background:#9dffb0}.modo:nth-child(4){background:#8fd3ff}
+
+.seccion{display:none;background:#242019;border:1px solid #35302a;border-radius:12px;padding:10px}
+.seccion h3{margin:0 0 8px;font-family:'Patrick Hand',cursive;font-size:1.05rem;color:#ffd75e}
+body[data-modo="escritura"] .sec-escritura,
+body[data-modo="funcion"]   .sec-escritura,
+body[data-modo="funcion"]   .sec-funcion,
+body[data-modo="geom2d"]    .sec-geom2d,
+body[data-modo="3d"]        .sec-3d{display:block}
+
+.paleta{display:flex;gap:8px;margin-bottom:10px}
+.color{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.25)}
+.herramientas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.herramientas button{background:#efe6d2;padding:8px 4px;font-size:.78rem}
+label{display:flex;align-items:center;gap:8px;font-size:.85rem;margin:6px 0}
+input[type=range]{flex:1;accent-color:#ffd75e}
+input[type=checkbox]{accent-color:#ffd75e;width:16px;height:16px}
+output{min-width:34px;text-align:right;font-weight:700}
+.fila{display:flex;gap:8px;margin-bottom:8px}
+.fila button,.seccion>button{flex:1;padding:8px;font-size:.82rem;background:#efe6d2}
+.nota{font-size:.78rem;color:#bdb6a6;margin:8px 0 0}
+
+.grupo-archivos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grupo-archivos button{padding:10px 2px;font-size:.75rem;background:#ffd75e}
+
+footer{display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+  padding:10px 16px;background:#1d1a17;border-top:2px solid #2c2823}
+.gparam{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:6px 12px;border-radius:12px;border:1.5px solid;background:#26221c}
+.gparam.rojo{border-color:#ff6b6b}.gparam.azul{border-color:#5bc0ff}
+.gparam .titulo{font-size:.8rem;font-weight:700;white-space:nowrap}
+.gparam label{margin:0;font-size:.78rem}
+
+@media (max-width:860px){
+  body{overflow:auto}
+  main{flex-direction:column}
+  aside{width:100%;flex-direction:row;flex-wrap:wrap}
+  .grupo-modos{grid-template-columns:repeat(4,1fr);width:100%}
+  .seccion{flex:1;min-width:185px}
+  #marco{min-height:60vh}
+}
+</style>
+</head>
+
+<body data-modo="escritura">
+
+<header>
+  <h1>🧮 Pizarra Interactiva</h1>
+  <div class="formulas">
+    <span class="chip rojo" id="chipCuad"></span>
+    <span class="chip azul" id="chipSeno"></span>
+    <span id="chipsUsuario"></span>
+  </div>
+</header>
+
+<!-- 🔍 Barra de reconocimiento de ecuaciones -->
+<div id="barraRecon" hidden>
+  <span>🔍</span>
+  <span id="txtRecon" contenteditable="true" spellcheck="false"></span>
+  <span id="varsRecon"></span>
+  <span id="fbRecon"></span>
+  <button id="btnGraficar" title="Interpretar y graficar (Enter)">📈 Graficar</button>
+  <button id="btnInsertarTexto" title="Insertar como texto en la pizarra">✏️ Insertar</button>
+  <button id="btnReintentar" title="Reconocer ahora">🔍</button>
+  <button id="btnDescartarBuf" title="Descartar trazos pendientes">↺</button>
+  <button id="btnLimpiarTxt" title="Limpiar el texto">🗑️</button>
+</div>
+
+<main>
+  <div id="marco">
+    <div id="pizarron">
+      <canvas id="pizarra"></canvas>
+      <div id="v3d" hidden></div>
+      <div id="pista"></div>
+    </div>
+  </div>
+
+  <aside>
+    <div class="grupo-modos">
+      <button class="modo activo" data-modo="escritura">✏️ Escritura</button>
+      <button class="modo" data-modo="funcion">📈 Función</button>
+      <button class="modo" data-modo="geom2d">📐 Geom. 2D</button>
+      <button class="modo" data-modo="3d">🧊 Geom. 3D</button>
+    </div>
+
+    <!-- ✏️ Módulo 1 -->
+    <div class="seccion sec-escritura">
+      <h3>✏️ Tiza</h3>
+      <div class="paleta">
+        <button class="color activa" data-color="#f4f1e6" style="background:#f4f1e6"></button>
+        <button class="color" data-color="#ffe08a" style="background:#ffe08a"></button>
+        <button class="color" data-color="#ff9eb5" style="background:#ff9eb5"></button>
+        <button class="color" data-color="#8fd3ff" style="background:#8fd3ff"></button>
+        <button class="color" data-color="#9dffb0" style="background:#9dffb0"></button>
+      </div>
+      <label>Grosor <input type="range" id="pGrosor" min="1" max="12" value="4"><output id="vGrosor">4</output></label>
+      <div class="fila">
+        <button id="btnGoma">🧽 Goma</button>
+        <button id="btnDeshacer">↩️ Deshacer</button>
+      </div>
+      <button id="btnRecon">🔍 Reconocer ecuación</button>
+      <button id="btnLimpiar">🗑️ Limpiar anotaciones</button>
+      <p class="nota">Con 🔍 activo escribe la <b>ecuación completa</b> y haz una pausa: <b>y=x²−3</b> (el 2 escrito arriba), <b>k=3</b>, <b>y=A sin x+B</b>… El texto se puede corregir a mano y con <b>📈</b> se grafica. Reconoce dígitos, letras, + − = ( ) / π √. Para dividir usa <b>/</b>.</p>
+    </div>
+
+    <!-- 📈 Módulo 2 -->
+    <div class="seccion sec-funcion">
+      <h3>📈 Curvas</h3>
+      <label><input type="checkbox" id="chkCuad" checked> 🔴 Cuadrática (sliders)</label>
+      <label><input type="checkbox" id="chkSeno" checked> 🔵 Senoidal (sliders)</label>
+      <p class="nota">También puedes <b>escribir cualquier función a mano</b>: pasa al modo ✏️ Escritura, activa 🔍 y grafícala con 📈.</p>
+    </div>
+
+    <!-- 📐 Módulo 3 -->
+    <div class="seccion sec-geom2d">
+      <h3>📐 Herramientas</h3>
+      <div class="herramientas">
+        <button class="herr activa" data-herr="regla">📏 Regla</button>
+        <button class="herr" data-herr="compas">⭕ Compás</button>
+        <button class="herr" data-herr="rect">▭ Rectángulo</button>
+        <button class="herr" data-herr="tri">🔺 Triángulo</button>
+        <button class="herr" data-herr="angulo">📐 Ángulo</button>
+        <button class="herr" data-herr="cubo3d">🧊 Cubo 3D</button>
+        <button class="herr" data-herr="esfera3d">🔵 Esfera 3D</button>
+      </div>
+      <div class="paleta">
+        <button class="color activa" data-color="#f4f1e6" style="background:#f4f1e6"></button>
+        <button class="color" data-color="#ffe08a" style="background:#ffe08a"></button>
+        <button class="color" data-color="#ff9eb5" style="background:#ff9eb5"></button>
+        <button class="color" data-color="#8fd3ff" style="background:#8fd3ff"></button>
+        <button class="color" data-color="#9dffb0" style="background:#9dffb0"></button>
+      </div>
+      <label><input type="checkbox" id="chkSnap" checked> 🧲 Ajustar a la cuadrícula</label>
+      <div class="fila">
+        <button id="btnDesFig">↩️ Deshacer</button>
+        <button id="btnLimFig">🗑️ Limpiar</button>
+      </div>
+      <p class="nota">🧊 Cubo y 🔵 Esfera dibujan <b>figuras 3D estilo tiza</b> (aristas ocultas punteadas). El ángulo usa 3 toques. Esc cancela.</p>
+    </div>
+
+    <!-- 🧊 Módulo 4 -->
+    <div class="seccion sec-3d">
+      <h3>🧊 Figura 3D</h3>
+      <div class="herramientas">
+        <button class="fig3d activa" data-fig="cubo">🧊 Cubo</button>
+        <button class="fig3d" data-fig="prisma">📦 Prisma</button>
+        <button class="fig3d" data-fig="esfera">🔵 Esfera</button>
+        <button class="fig3d" data-fig="cono">🍦 Cono</button>
+        <button class="fig3d" data-fig="cilindro">🛢️ Cilindro</button>
+        <button class="fig3d" data-fig="piramide">🔺 Pirámide</button>
+        <button class="fig3d" data-fig="tetraedro">🎷 Tetraedro</button>
+        <button class="fig3d" data-fig="toro">🍩 Toro</button>
+      </div>
+      <label><input type="checkbox" id="chkWire"> 🕸️ Modo alámbrico</label>
+      <label><input type="checkbox" id="chkRot" checked> 🔄 Rotación automática</label>
+      <button id="btnReset3d">🎯 Reiniciar vista</button>
+    </div>
+
+    <div class="grupo-archivos">
+      <button id="btnPNG" title="Descargar imagen">🖼️ PNG</button>
+      <button id="btnGuardar" title="Guardar toda la clase (.json)">💾 Guardar</button>
+      <button id="btnAbrir" title="Abrir una clase guardada">📂 Abrir</button>
+    </div>
+    <input type="file" id="archivoClase" accept="application/json,.json" hidden>
+  </aside>
+</main>
+
+<footer>
+  <div class="gparam rojo">
+    <span class="titulo">🔴 y = a·x² + b·x + c</span>
+    <label>a <input type="range" id="pa" min="-3" max="3" step="0.1" value="1"><output id="va">1</output></label>
+    <label>b <input type="range" id="pb" min="-5" max="5" step="0.1" value="0"><output id="vb">0</output></label>
+    <label>c <input type="range" id="pc" min="-10" max="10" step="0.1" value="-3"><output id="vc">-3</output></label>
+  </div>
+  <div class="gparam azul">
+    <span class="titulo">🔵 y = A·sin(k·x) + B</span>
+    <label>A <input type="range" id="pA" min="-4" max="4" step="0.1" value="2"><output id="vA">2</output></label>
+    <label>k <input type="range" id="pk" min="-4" max="4" step="0.1" value="1"><output id="vk">1</output></label>
+    <label>B <input type="range" id="pB" min="-5" max="5" step="0.1" value="0"><output id="vB">0</output></label>
+  </div>
+  <div class="gparam">
+    <span class="titulo">🔍 Vista</span>
+    <label>Escala <input type="range" id="pEsc" min="15" max="80" value="40"><output id="vEsc">40</output></label>
+    <label><input type="checkbox" id="chkGrid" checked> Cuadrícula</label>
+  </div>
+</footer>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const pizarra = $('pizarra'), ctx = pizarra.getContext('2d');
+const pizarron = $('pizarron'), v3d = $('v3d'), pista = $('pista');
+
+/* ==================== ESTADO ==================== */
+let modo = 'escritura';
+let W = 0, H = 0, escala = 40, cuadricula = true;
+let tizaColor = '#f4f1e6', grosor = 4, herramienta = 'tiza';
+let herr2d = 'regla', snap = true;
+const trazos = [], figuras = [];
+const fq = { a: 1, b: 0, c: -3, on: true };
+const fs = { A: 2, k: 1, B: 0, on: true };
+let actual = null, borrando = false, angTmp = null;
+let vars = {};                       // variables definidas: k=3, A=2...
+const curvasUsuario = [];            // ecuaciones escritas a mano
+let contadorCurvas = 0;
+const COLORES_USUARIO = ['#ffd75e','#ff9eb5','#9dffb0','#8fd3ff','#e0b0ff','#ffa94d'];
+
+const uX = x => W / 2 + x * escala;
+const uY = y => H / 2 - y * escala;
+const mX = px => (px - W / 2) / escala;
+const mY = py => (H / 2 - py) / escala;
+const bonito = n => String(Math.round(n * 10) / 10);
+const cero = v => Math.abs(v) < 1e-9;
+
+/* ==================== LIENZO 2D ==================== */
+function redimensionar() {
+  W = pizarron.clientWidth; H = pizarron.clientHeight;
+  const d = window.devicePixelRatio || 1;
+  pizarra.width = Math.round(W * d); pizarra.height = Math.round(H * d);
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  if (modo === '3d') ajustar3D(); else pedirRender();
+}
+window.addEventListener('resize', redimensionar);
+
+let pend = false;
+function pedirRender() {
+  if (pend || modo === '3d') return;
+  pend = true;
+  requestAnimationFrame(() => { pend = false; render(); });
+}
+
+function render() {
+  const g = ctx.createRadialGradient(W*.35, H*.25, 60, W*.5, H*.5, Math.max(W, H)*.8);
+  g.addColorStop(0, '#27513c'); g.addColorStop(1, '#1b3427');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  if (cuadricula) cuadriculaFn();
+  if (fq.on) curva(x => fq.a*x*x + fq.b*x + fq.c, '#ff6b6b');
+  if (fs.on) curva(x => fs.A * Math.sin(fs.k * x) + fs.B, '#5bc0ff');
+  curvasUsuario.forEach(c => curva(c.fn, c.color));
+  figuras.forEach(figura);
+  trazos.forEach(trazoFn);
+  if (actual) actual.tipo === 'trazo' ? trazoFn(actual) : figura(actual.fig);
+  if (angTmp) previsualizarAngulo();
+}
+
+function cuadriculaFn() {
+  const xi = Math.floor(mX(0)), xf = Math.ceil(mX(W));
+  const yi = Math.floor(mY(H)), yf = Math.ceil(mY(0));
+  ctx.lineWidth = 1;
+  for (let x = xi; x <= xf; x++) {
+    ctx.strokeStyle = x % 5 === 0 ? 'rgba(244,241,230,.30)' : 'rgba(244,241,230,.11)';
+    ctx.beginPath(); ctx.moveTo(uX(x), 0); ctx.lineTo(uX(x), H); ctx.stroke();
+  }
+  for (let y = yi; y <= yf; y++) {
+    ctx.strokeStyle = y % 5 === 0 ? 'rgba(244,241,230,.30)' : 'rgba(244,241,230,.11)';
+    ctx.beginPath(); ctx.moveTo(0, uY(y)); ctx.lineTo(W, uY(y)); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(244,241,230,.85)'; ctx.lineWidth = 2; ctx.fillStyle = 'rgba(244,241,230,.85)';
+  ctx.beginPath(); ctx.moveTo(0, uY(0)); ctx.lineTo(W - 8, uY(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(uX(0), H); ctx.lineTo(uX(0), 8); ctx.stroke();
+  flecha(W - 6, uY(0), 1, 0); flecha(uX(0), 6, 0, -1);
+  ctx.font = 'italic 15px Nunito, sans-serif';
+  ctx.fillText('x', W - 20, uY(0) - 10); ctx.fillText('y', uX(0) + 10, 20);
+  const paso = escala >= 30 ? 1 : escala >= 18 ? 2 : 5;
+  ctx.font = '12px Nunito, sans-serif'; ctx.fillStyle = 'rgba(244,241,230,.6)';
+  for (let x = xi; x <= xf; x++) if (x % paso === 0 && x !== 0) ctx.fillText(x, uX(x) + 3, uY(0) + 14);
+  for (let y = yi; y <= yf; y++) if (y % paso === 0 && y !== 0) ctx.fillText(y, uX(0) + 6, uY(y) - 4);
+}
+function flecha(x, y, dx, dy) {
+  ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.lineTo(x - dx*9 - dy*4, y - dy*9 + dx*4);
+  ctx.lineTo(x - dx*9 + dy*4, y - dy*9 - dx*4);
+  ctx.closePath(); ctx.fill();
+}
+
+function curva(f, color) {                    // tolera errores y asíntotas
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.shadowColor = color; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  let pluma = true;
+  for (let px = 0; px <= W; px += 2) {
+    let py;
+    try { py = uY(f(mX(px))); } catch (e) { py = NaN; }
+    if (!isFinite(py)) { pluma = true; continue; }
+    pluma ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    pluma = false;
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+function trazoFn(t) {
+  ctx.save();
+  ctx.strokeStyle = t.color; ctx.fillStyle = t.color;
+  ctx.lineWidth = t.ancho; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (t.pts.length === 1) {
+    ctx.beginPath();
+    ctx.arc(uX(t.pts[0].x), uY(t.pts[0].y), Math.max(1.5, t.ancho / 2), 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    t.pts.forEach((p, i) => i ? ctx.lineTo(uX(p.x), uY(p.y)) : ctx.moveTo(uX(p.x), uY(p.y)));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function punto(x, y, color) {
+  ctx.save(); ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(uX(x), uY(y), 3.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+function etiqueta(texto, x, y, color) {
+  ctx.save();
+  ctx.font = '18px "Patrick Hand", cursive';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = color;
+  ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 4;
+  ctx.fillText(texto, uX(x), uY(y) - 6);
+  ctx.restore();
+}
+function etiquetaPx(texto, x, y, color) {
+  ctx.save();
+  ctx.font = '18px "Patrick Hand", cursive';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+  ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 4;
+  ctx.fillText(texto, x, y);
+  ctx.restore();
+}
+function linea(x1, y1, x2, y2) {
+  ctx.beginPath(); ctx.moveTo(uX(x1), uY(y1)); ctx.lineTo(uX(x2), uY(y2)); ctx.stroke();
+}
+
+/* ---------- Geometría 2D + figuras 3D estilo tiza ---------- */
+function dibujarAngulo(v, a, b, color) {
+  const cx = uX(v.x), cy = uY(v.y), ax = uX(a.x), ay = uY(a.y);
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ax, ay); ctx.stroke();
+  punto(v.x, v.y, color); punto(a.x, a.y, color);
+  if (b) {
+    const bx = uX(b.x), by = uY(b.y);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke();
+    punto(b.x, b.y, color);
+    const a1 = Math.atan2(ay - cy, ax - cx), a2 = Math.atan2(by - cy, bx - cx);
+    let dif = a2 - a1;
+    while (dif > Math.PI) dif -= 2 * Math.PI;
+    while (dif < -Math.PI) dif += 2 * Math.PI;
+    const grados = Math.abs(dif) * 180 / Math.PI;
+    const r = Math.min(Math.min(Math.hypot(ax-cx, ay-cy), Math.hypot(bx-cx, by-cy)) * .4 + 14, 90);
+    ctx.beginPath(); ctx.arc(cx, cy, r, a1, a2, dif < 0); ctx.stroke();
+    const m = a1 + dif / 2;
+    etiquetaPx(bonito(grados) + '°', cx + Math.cos(m) * (r + 18), cy + Math.sin(m) * (r + 18), color);
+  }
+  ctx.restore();
+}
+
+function figura(f) {
+  ctx.save();
+  ctx.strokeStyle = f.color; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const { x1, y1, x2, y2 } = f;
+  if (f.tipo === 'regla') {
+    ctx.beginPath(); ctx.moveTo(uX(x1), uY(y1)); ctx.lineTo(uX(x2), uY(y2)); ctx.stroke();
+    punto(x1, y1, f.color); punto(x2, y2, f.color);
+    etiqueta(bonito(Math.hypot(x2 - x1, y2 - y1)) + ' u', (x1 + x2)/2, (y1 + y2)/2, f.color);
+  } else if (f.tipo === 'compas') {
+    const r = Math.hypot(x2 - x1, y2 - y1);
+    ctx.beginPath(); ctx.arc(uX(x1), uY(y1), r * escala, 0, Math.PI * 2); ctx.stroke();
+    punto(x1, y1, f.color);
+    etiqueta('r = ' + bonito(r), x1 + r * .7071, y1 + r * .7071, f.color);
+  } else if (f.tipo === 'rect') {
+    ctx.beginPath();
+    ctx.rect(uX(Math.min(x1, x2)), uY(Math.max(y1, y2)),
+             Math.abs(x2 - x1) * escala, Math.abs(y2 - y1) * escala);
+    ctx.stroke();
+    etiqueta(bonito(Math.abs(x2 - x1)) + ' × ' + bonito(Math.abs(y2 - y1)) + ' u',
+             (x1 + x2)/2, Math.max(y1, y2), f.color);
+  } else if (f.tipo === 'tri') {
+    ctx.beginPath();
+    ctx.moveTo(uX(x1), uY(y1)); ctx.lineTo(uX(x2), uY(y1)); ctx.lineTo(uX(x1), uY(y2));
+    ctx.closePath(); ctx.stroke();
+    punto(x1, y1, f.color); punto(x2, y1, f.color); punto(x1, y2, f.color);
+    etiqueta('b=' + bonito(Math.abs(x2 - x1)) + ' · h=' + bonito(Math.abs(y2 - y1)),
+             (x1 + x2)/2, y1, f.color);
+  } else if (f.tipo === 'angulo') {
+    dibujarAngulo({x: f.vx, y: f.vy}, {x: f.ax, y: f.ay}, {x: f.bx, y: f.by}, f.color);
+  } else if (f.tipo === 'texto') {
+    ctx.font = '26px "Patrick Hand", cursive';
+    ctx.fillStyle = f.color; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 3;
+    ctx.fillText(f.texto, uX(f.x), uY(f.y));
+  } else if (f.tipo === 'cubo3d') {
+    /* 🧊 Cubo en perspectiva oblicua, aristas ocultas punteadas */
+    const ax = Math.min(x1, x2), bx = Math.max(x1, x2);
+    const ay = Math.min(y1, y2), by = Math.max(y1, y2);
+    const a = bx - ax, b = by - ay, d = Math.max(.2, Math.min(a, b) * .55);
+    ctx.setLineDash([7, 7]);                              // ocultas
+    linea(ax + d, ay + d, ax + d, by + d);                // arista trasera izq.
+    linea(ax + d, ay + d, bx + d, ay + d);                // arista trasera inf.
+    linea(ax, ay, ax + d, ay + d);                        // conector inf-izq
+    ctx.setLineDash([]);                                  // visibles
+    ctx.strokeRect(uX(ax), uY(by), a * escala, b * escala);      // cara frontal
+    linea(ax + d, by + d, bx + d, by + d);                // trasera sup.
+    linea(bx + d, ay + d, bx + d, by + d);                // trasera der.
+    linea(ax, by, ax + d, by + d);                        // conectores
+    linea(bx, by, bx + d, by + d);
+    linea(bx, ay, bx + d, ay + d);
+    etiquetaPx(bonito(a) + '×' + bonito(b) + '×' + bonito(d) + ' u',
+               uX((ax + bx) / 2), uY(ay) + 26, f.color);
+  } else if (f.tipo === 'esfera3d') {
+    /* 🔵 Esfera: círculo + ecuador + meridiano punteado */
+    const r = Math.hypot(x2 - x1, y2 - y1);
+    const cx = uX(x1), cy = uY(y1);
+    if (r > 0.05) {
+      ctx.beginPath(); ctx.arc(cx, cy, r * escala, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(cx, cy, r * escala, r * escala * .32, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath(); ctx.ellipse(cx, cy, r * escala * .32, r * escala, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    punto(x1, y1, f.color);
+    etiquetaPx('r = ' + bonito(r), cx, cy - r * escala - 14, f.color);
+  }
+  ctx.restore();
+}
+
+function previsualizarAngulo() {
+  ctx.save(); ctx.globalAlpha = .85;
+  if (angTmp.paso === 1) {
+    punto(angTmp.v.x, angTmp.v.y, tizaColor);
+    if (angTmp.cur) dibujarAngulo(angTmp.v, angTmp.cur, null, tizaColor);
+  } else {
+    dibujarAngulo(angTmp.v, angTmp.a, angTmp.cur || angTmp.a, tizaColor);
+  }
+  ctx.restore();
+}
+
+/* ==================== DIBUJO (mouse / táctil / lápiz) ==================== */
+function puntero(e) {
+  const r = pizarra.getBoundingClientRect();
+  return { x: mX(e.clientX - r.left), y: mY(e.clientY - r.top) };
+}
+const ajustar = v => snap ? Math.round(v * 2) / 2 : v;
+
+pizarra.addEventListener('pointerdown', e => {
+  if (modo === '3d') return;
+  pizarra.setPointerCapture(e.pointerId);
+  const p = puntero(e);
+  if (modo === 'geom2d') {
+    const s = { x: ajustar(p.x), y: ajustar(p.y) };
+    if (herr2d === 'angulo') {
+      if (!angTmp) {
+        angTmp = { paso: 1, v: s, cur: null };
+        pista.textContent = '📐 Ángulo: toca el extremo del 1er lado';
+      } else if (angTmp.paso === 1) {
+        angTmp.a = s; angTmp.paso = 2; angTmp.cur = null;
+        pista.textContent = '📐 Ángulo: toca el extremo del 2do lado';
+      } else {
+        figuras.push({ tipo: 'angulo', vx: angTmp.v.x, vy: angTmp.v.y,
+                       ax: angTmp.a.x, ay: angTmp.a.y, bx: s.x, by: s.y, color: tizaColor });
+        angTmp = null; pista.textContent = PISTAS.geom2d;
+      }
+    } else {
+      angTmp = null;
+      actual = { tipo: 'figura', fig: { tipo: herr2d, x1: s.x, y1: s.y, x2: s.x, y2: s.y, color: tizaColor } };
+    }
+  } else if (herramienta === 'goma') {
+    borrando = true; goma(p);
+  } else {
+    actual = { tipo: 'trazo', pts: [{ x: p.x, y: p.y }], color: tizaColor, ancho: grosor };
+  }
+  pedirRender();
+});
+
+pizarra.addEventListener('pointermove', e => {
+  const p = puntero(e);
+  if (borrando) { goma(p); pedirRender(); return; }
+  if (angTmp && modo === 'geom2d') { angTmp.cur = p; pedirRender(); }
+  if (!actual) return;
+  if (actual.tipo === 'trazo') {
+    const u = actual.pts[actual.pts.length - 1];
+    if (Math.hypot(p.x - u.x, p.y - u.y) > 0.02) actual.pts.push({ x: p.x, y: p.y });
+  } else { actual.fig.x2 = ajustar(p.x); actual.fig.y2 = ajustar(p.y); }
+  pedirRender();
+});
+
+function soltar() {
+  if (actual) {
+    if (actual.tipo === 'trazo') {
+      if (actual.pts.length) {
+        trazos.push(actual);
+        if (reconActivo) { bufferRecon.push(actual); programarRecon(); }
+      }
+    } else {
+      const { x1, y1, x2, y2 } = actual.fig;
+      if (Math.hypot(x2 - x1, y2 - y1) > 0.01) figuras.push(actual.fig);
+    }
+  }
+  actual = null; borrando = false; pedirRender();
+}
+pizarra.addEventListener('pointerup', soltar);
+pizarra.addEventListener('pointercancel', soltar);
+pizarra.addEventListener('contextmenu', e => e.preventDefault());
+
+function goma(p) {
+  const radio = Math.max(16, grosor * 4) / escala;
+  for (let i = trazos.length - 1; i >= 0; i--)
+    if (trazos[i].pts.some(q => Math.hypot(q.x - p.x, q.y - p.y) < radio)) trazos.splice(i, 1);
+}
+
+/* ==================== RECONOCEDOR $P (nube de puntos, offline) ==================== */
+const NP = 32;
+let reconActivo = false, bufferRecon = [], reconTimer = null, ultimaPos = null;
+
+const TPL = {
+  '0': [[[.30,.50],[.34,.28],[.50,.10],[.66,.28],[.70,.50],[.66,.72],[.50,.90],[.34,.72],[.30,.50]]],
+  '1': [[[.50,.12],[.50,.90]]],
+  '2': [[[.24,.28],[.32,.13],[.50,.08],[.66,.16],[.68,.34],[.52,.52],[.30,.72],[.22,.90],[.78,.90]]],
+  '3': [[[.24,.16],[.42,.08],[.62,.16],[.64,.32],[.46,.46],[.30,.50],[.50,.54],[.68,.64],[.68,.80],[.52,.92],[.28,.92],[.14,.84]]],
+  '4': [[[.62,.10],[.20,.62],[.80,.62]],[[.62,.10],[.62,.92]]],
+  '5': [[[.70,.12],[.30,.12],[.28,.42],[.48,.38],[.66,.46],[.72,.66],[.58,.88],[.32,.90],[.18,.78]]],
+  '6': [[[.64,.10],[.42,.30],[.26,.56],[.24,.76],[.38,.90],[.58,.88],[.66,.72],[.58,.58],[.40,.56],[.28,.68],[.26,.78]]],
+  '7': [[[.22,.16],[.78,.16],[.48,.90]]],
+  '8': [[[.50,.12],[.34,.18],[.30,.32],[.44,.44],[.60,.54],[.68,.70],[.60,.86],[.42,.92],[.28,.84],[.32,.66],[.50,.50],[.64,.36],[.66,.22],[.50,.10]]],
+  '9': [[[.34,.86],[.42,.36],[.56,.14],[.70,.24],[.66,.44],[.48,.52],[.30,.44],[.28,.28],[.42,.12]]],
+  '+': [[[.12,.50],[.88,.50]],[[.50,.12],[.50,.88]]],
+  '-': [[[.16,.50],[.84,.50]]],
+  '=': [[[.16,.36],[.84,.36]],[[.16,.64],[.84,.64]]],
+  '(': [[[.68,.10],[.48,.38],[.48,.62],[.68,.90]]],
+  ')': [[[.32,.10],[.52,.38],[.52,.62],[.32,.90]]],
+  '/': [[[.70,.10],[.30,.90]]],
+  'x': [[[.26,.26],[.74,.74]],[[.74,.26],[.26,.74]]],
+  'y': [[[.30,.10],[.50,.52],[.68,.88]],[[.70,.10],[.44,.62]]],
+  'a': [[[.70,.48],[.50,.34],[.34,.40],[.30,.58],[.40,.74],[.58,.76],[.68,.92]]],
+  'b': [[[.32,.10],[.32,.90]],[[.32,.46],[.60,.42],[.68,.60],[.60,.80],[.34,.88]]],
+  'c': [[[.68,.30],[.48,.12],[.30,.22],[.26,.50],[.30,.75],[.48,.90],[.68,.78]]],
+  'd': [[[.66,.10],[.66,.90]],[[.66,.22],[.46,.14],[.32,.32],[.34,.60],[.50,.76],[.66,.70]]],
+  'e': [[[.68,.25],[.45,.10],[.30,.25],[.30,.50],[.55,.50],[.68,.62],[.60,.82],[.38,.90],[.24,.80]]],
+  'f': [[[.62,.12],[.44,.14],[.38,.34],[.38,.90]],[[.20,.36],[.56,.34]]],
+  'g': [[[.66,.18],[.46,.10],[.32,.22],[.30,.44],[.44,.54],[.62,.58],[.70,.72],[.62,.88],[.42,.92],[.28,.82]],[[.20,.76],[.30,.94]]],
+  'h': [[[.30,.10],[.30,.90]],[[.30,.42],[.50,.32],[.64,.44],[.68,.66],[.68,.90]]],
+  'i': [[[.50,.08],[.50,.68]],[[.50,.76],[.50,.80]]],
+  'k': [[[.32,.10],[.32,.90]],[[.70,.16],[.32,.54],[.72,.90]]],
+  'm': [[[.24,.85],[.24,.28],[.34,.14],[.44,.26],[.47,.85],[.50,.30],[.58,.14],[.68,.26],[.70,.85]]],
+  'n': [[[.28,.85],[.28,.25],[.30,.15],[.45,.10],[.60,.18],[.70,.35],[.72,.60],[.72,.85]]],
+  'o': [[[.50,.10],[.32,.20],[.26,.45],[.32,.72],[.50,.90],[.68,.76],[.72,.45],[.64,.20],[.50,.10]]],
+  'p': [[[.30,.12],[.30,.95]],[[.30,.20],[.54,.14],[.66,.32],[.60,.56],[.38,.62],[.30,.55]]],
+  'q': [[[.66,.12],[.66,.78],[.78,.94]],[[.38,.28],[.52,.16],[.64,.28],[.64,.50],[.50,.60],[.38,.50],[.36,.28]]],
+  'r': [[[.30,.85],[.30,.28],[.32,.18]],[[.32,.30],[.50,.16],[.64,.24]]],
+  's': [[[.68,.20],[.50,.10],[.32,.16],[.30,.34],[.48,.44],[.66,.54],[.68,.72],[.50,.88],[.30,.82],[.22,.72]]],
+  't': [[[.50,.08],[.50,.80]],[[.25,.25],[.75,.25]]],
+  'u': [[[.28,.12],[.28,.58],[.36,.80],[.52,.88],[.66,.78],[.70,.58],[.70,.12]]],
+  'v': [[[.26,.12],[.50,.88],[.74,.12]]],
+  'w': [[[.18,.12],[.32,.86],[.50,.26],[.68,.86],[.82,.12]]],
+  'z': [[[.26,.16],[.74,.16],[.30,.84],[.74,.84]]],
+  'A': [[[.28,.90],[.50,.10],[.72,.90]],[[.38,.62],[.66,.62]]],
+  'B': [[[.32,.10],[.32,.90]],[[.32,.10],[.60,.18],[.56,.38],[.32,.44]],[[.32,.44],[.64,.52],[.60,.78],[.32,.90]]],
+  'C': [[[.72,.24],[.54,.10],[.34,.14],[.22,.36],[.22,.64],[.34,.86],[.54,.90],[.72,.76]]],
+  'D': [[[.28,.10],[.28,.90]],[[.28,.10],[.56,.14],[.70,.34],[.66,.66],[.52,.86],[.28,.90]]],
+  'F': [[[.68,.10],[.30,.12],[.30,.90]],[[.30,.48],[.60,.48]]],
+  'K': [[[.30,.10],[.30,.90]],[[.66,.14],[.32,.50]],[[.36,.54],[.70,.90]]],
+  'M': [[[.24,.90],[.24,.12],[.50,.58],[.76,.12],[.76,.90]]],
+  'N': [[[.26,.88],[.26,.12],[.74,.88],[.74,.12]]],
+  'P': [[[.30,.10],[.30,.90]],[[.30,.10],[.58,.15],[.65,.33],[.56,.50],[.30,.52]]],
+  'R': [[[.30,.10],[.30,.90]],[[.30,.10],[.58,.16],[.64,.34],[.54,.50],[.30,.52]],[[.42,.52],[.72,.90]]],
+  'S': [[[.70,.22],[.52,.10],[.34,.18],[.36,.38],[.56,.48],[.72,.58],[.72,.78],[.52,.90],[.30,.84],[.22,.72]]],
+  'T': [[[.22,.12],[.78,.12]],[[.50,.12],[.50,.90]]],
+  'X': [[[.26,.14],[.74,.88]],[[.74,.14],[.26,.88]]],
+  'Y': [[[.28,.12],[.50,.50],[.72,.12]],[[.50,.50],[.50,.90]]],
+  'π': [[[.14,.36],[.86,.36]],[[.30,.36],[.24,.90]],[[.70,.36],[.76,.90]]],
+  '√': [[[.08,.58],[.22,.52],[.34,.90],[.52,.10],[.92,.10]]]
+};
+
+function remuestrear(trazo, n) {
+  const t = trazo.length < 2 ? [trazo[0], trazo[0]] : trazo;
+  const pts = [t[0].slice()];
+  let L = 0;
+  for (let i = 1; i < t.length; i++) L += Math.hypot(t[i][0]-t[i-1][0], t[i][1]-t[i-1][1]);
+  const D = L / (n - 1) || 1;
+  let d = 0, prev = t[0];
+  const resto = t.slice(1);
+  while (resto.length && pts.length < n) {
+    const p = resto[0];
+    const dist = Math.hypot(p[0]-prev[0], p[1]-prev[1]);
+    if (d + dist >= D && dist > 0) {
+      const q = (D - d) / dist;
+      const np = [prev[0] + q*(p[0]-prev[0]), prev[1] + q*(p[1]-prev[1])];
+      pts.push(np); resto.unshift(np); prev = np; d = 0;
+    } else { d += dist; prev = p; resto.shift(); }
+  }
+  while (pts.length < n) pts.push(pts[pts.length - 1].slice());
+  return pts;
+}
+
+function normalizarNube(trazosArr) {
+  if (!trazosArr.length) return null;
+  const ls = trazosArr.map(t => {
+    let l = 0;
+    for (let i = 1; i < t.length; i++) l += Math.hypot(t[i][0]-t[i-1][0], t[i][1]-t[i-1][1]);
+    return l;
+  });
+  const L = ls.reduce((a, b) => a + b, 0);
+  if (L < 1e-6) return null;
+  let nube = [];
+  trazosArr.forEach((t, i) => {
+    nube = nube.concat(remuestrear(t, Math.max(2, Math.round(NP * ls[i] / L))));
+  });
+  while (nube.length < NP) nube.push(nube[nube.length - 1].slice());
+  nube = nube.slice(0, NP);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of nube) {
+    if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+  }
+  const s = Math.max(maxX - minX, maxY - minY) || 1;
+  return nube.map(p => [(p[0] - minX) / s, (p[1] - minY) / s]);
+}
+
+function distanciaNubes(A, B) {
+  const dir = (X, Y) => {
+    const usados = new Array(Y.length).fill(false);
+    let s = 0;
+    for (const p of X) {
+      let m = Infinity, idx = 0;
+      for (let j = 0; j < Y.length; j++) {
+        if (usados[j]) continue;
+        const d = (p[0]-Y[j][0])**2 + (p[1]-Y[j][1])**2;
+        if (d < m) { m = d; idx = j; }
+      }
+      usados[idx] = true; s += m;
+    }
+    return s;
+  };
+  return Math.min(dir(A, B), dir(B, A));
+}
+
+const PLANTILLAS = [];
+for (const [nombre, trazosT] of Object.entries(TPL)) {
+  const n = normalizarNube(trazosT);
+  if (n) PLANTILLAS.push({ nombre, nube: n });
+}
+
+/* ---------- Segmentación: agrupar trazos en símbolos ---------- */
+function caja(pts) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function agruparSimbolos(strokes) {
+  if (!strokes.length) return [];
+  const cajas = strokes.map(t => caja(t.pts));
+  const altMedia = cajas.reduce((a, c) => a + (c.maxY - c.minY), 0) / cajas.length || 1;
+  const UMBRAL = Math.max(0.15, altMedia * 0.35);
+  const orden = strokes.map((_, i) => i).sort((a, b) => cajas[a].minX - cajas[b].minX);
+  const grupos = [];
+  for (const i of orden) {
+    const c = cajas[i];
+    let colocado = false;
+    for (const g of grupos) {
+      const sep = Math.max(g.caja.minX - c.maxX, c.minX - g.caja.maxX);
+      if (sep < UMBRAL) {
+        g.miembros.push(strokes[i]);
+        g.caja = { minX: Math.min(g.caja.minX, c.minX), maxX: Math.max(g.caja.maxX, c.maxX),
+                   minY: Math.min(g.caja.minY, c.minY), maxY: Math.max(g.caja.maxY, c.maxY) };
+        colocado = true; break;
+      }
+    }
+    if (!colocado) grupos.push({ miembros: [strokes[i]], caja: { ...c } });
+  }
+  /* Separar exponentes: trazos pequeños, arriba y a la derecha */
+  const salida = [];
+  for (const g of grupos) {
+    const info = g.miembros.map(t => { const c = caja(t.pts); return { t, c, h: c.maxY - c.minY }; });
+    const bottoms = info.map(o => o.c.minY).sort((a, b) => a - b);
+    const medBottom = bottoms[Math.floor(bottoms.length / 2)];
+    const gH = g.caja.maxY - g.caja.minY, gW = g.caja.maxX - g.caja.minX;
+    const altos = [], normales = [];
+    let hPrincipal = 0;
+    info.forEach(o => {
+      const esAlto = g.miembros.length > 1 &&
+        o.c.minY > medBottom + 0.3 * gH && o.c.minX > g.caja.minX + 0.35 * gW;
+      if (esAlto) altos.push(o); else { normales.push(o); hPrincipal = Math.max(hPrincipal, o.h); }
+    });
+    if (altos.length && normales.length && altos.every(o => o.h < 0.8 * hPrincipal)) {
+      salida.push(...agruparSimbolos(normales.map(o => o.t)));
+      salida.push(...agruparSimbolos(altos.map(o => o.t)));
+    } else salida.push(g);
+  }
+  salida.sort((a, b) => a.caja.minX - b.caja.minX);
+  return salida.map(g => ({ trazos: g.miembros, caja: g.caja }));
+}
+
+function fb(msg) { $('fbRecon').textContent = msg; }
+
+function centroide(buf) {
+  let x = 0, y = 0, n = 0;
+  buf.forEach(t => t.pts.forEach(p => { x += p.x; y += p.y; n++; }));
+  return n ? { x: x / n, y: y / n } : { x: mX(80), y: mY(60) };
+}
+
+function programarRecon() {
+  clearTimeout(reconTimer);
+  reconTimer = setTimeout(reconocerEcuacion, 2200);
+}
+
+/* ---------- Reconocer la ecuación completa ---------- */
+function reconocerEcuacion() {
+  clearTimeout(reconTimer); reconTimer = null;
+  bufferRecon = bufferRecon.filter(t => trazos.includes(t));
+  if (!bufferRecon.length) return;
+  const grupos = agruparSimbolos(bufferRecon);
+  const partes = []; let suma = 0;
+  for (const g of grupos) {
+    const nube = normalizarNube(g.trazos.map(t => t.pts.map(q => [q.x, -q.y])));
+    if (!nube) continue;
+    let mejor = null, mD = Infinity;
+    for (const pl of PLANTILLAS) {
+      const d = distanciaNubes(nube, pl.nube);
+      if (d < mD) { mD = d; mejor = pl; }
+    }
+    const conf = Math.max(0, 1 - Math.sqrt(mD / NP) / 0.5);
+    partes.push({ ch: mejor.nombre, conf, caja: g.caja });
+    suma += conf;
+  }
+  if (!partes.length) return;
+  const confMedia = suma / partes.length;
+  if (confMedia < 0.45) {
+    fb('❓ confianza ' + Math.round(confMedia * 100) + '% — escribe más grande o pulsa ↺ y reintenta');
+    return;
+  }
+  /* Insertar ^ en los símbolos elevados (exponentes) */
+  const bases = partes.map(p => p.caja.minY).sort((a, b) => a - b);
+  const base = bases[Math.floor(bases.length / 2)];
+  let txt = '', exp = false;
+  partes.forEach((p, i) => {
+    if (i > 0) {
+      const prev = partes[i - 1];
+      const prevCy = (prev.caja.minY + prev.caja.maxY) / 2;
+      if (!exp && p.caja.minY > prevCy) { txt += '^'; exp = true; }
+      else if (exp && p.caja.minY <= base) exp = false;
+    }
+    txt += p.ch;
+  });
+  ultimaPos = centroide(bufferRecon);
+  bufferRecon.forEach(t => { const i = trazos.indexOf(t); if (i > -1) trazos.splice(i, 1); });
+  bufferRecon = [];
+  $('txtRecon').textContent = txt;
+  fb('🔍 "' + txt + '" · ' + Math.round(confMedia * 100) + '% — corrige si hace falta y pulsa 📈');
+  actualizarBarra(); pedirRender();
+}
+
+/* ==================== INTÉRPRETE DE ECUACIONES ==================== */
+function tokenizar(s) {
+  const toks = []; let i = 0;
+  const FUNCS = ['sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'abs'];
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === ' ' || ch === '\u00a0') { i++; continue; }
+    if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(s[i+1] || ''))) {
+      const m = s.slice(i).match(/^\d+(\.\d+)?/);
+      toks.push({ t: 'num', v: parseFloat(m[0]) }); i += m[0].length; continue;
+    }
+    if (ch === '√') { toks.push({ t: 'fn', v: 'sqrt' }); i++; continue; }
+    if (ch === 'π') { toks.push({ t: 'num', v: Math.PI }); i++; continue; }
+    if (/[a-zA-Z]/.test(ch)) {
+      let matched = null;
+      for (const f of FUNCS) if (s.startsWith(f, i)) { matched = f; break; }
+      if (matched) { toks.push({ t: 'fn', v: matched }); i += matched.length; continue; }
+      if (s.startsWith('pi', i)) { toks.push({ t: 'num', v: Math.PI }); i += 2; continue; }
+      toks.push({ t: 'id', v: ch }); i++; continue;
+    }
+    if ('+-*/^()'.includes(ch)) { toks.push({ t: 'op', v: ch }); i++; continue; }
+    return null;
+  }
+  return toks;
+}
+
+function parsear(toks) {
+  let pos = 0;
+  if (!toks) throw 0;
+  const peek = () => toks[pos];
+  const empiezaPrimario = tk => tk && (tk.t === 'num' || tk.t === 'id' || tk.t === 'fn' ||
+                                       (tk.t === 'op' && tk.v === '('));
+  function expr() {
+    let n = term();
+    while (peek() && peek().t === 'op' && (peek().v === '+' || peek().v === '-')) {
+      const op = toks[pos++].v; n = { type: 'bin', op, a: n, b: term() };
+    }
+    return n;
+  }
+  function term() {
+    let n = unario();
+    for (;;) {
+      const tk = peek();
+      if (tk && tk.t === 'op' && (tk.v === '*' || tk.v === '/')) {
+        pos++; n = { type: 'bin', op: tk.v, a: n, b: unario() };
+      } else if (empiezaPrimario(tk)) {           // multiplicación implícita: 2x, 3(x+1)
+        n = { type: 'bin', op: '*', a: n, b: unario() };
+      } else break;
+    }
+    return n;
+  }
+  function unario() {
+    const tk = peek();
+    if (tk && tk.t === 'op' && tk.v === '-') { pos++; return { type: 'neg', a: unario() }; }
+    if (tk && tk.t === 'op' && tk.v === '+') { pos++; return unario(); }
+    return potencia();
+  }
+  function potencia() {
+    const base = primario();
+    const tk = peek();
+    if (tk && tk.t === 'op' && tk.v === '^') { pos++; return { type: 'bin', op: '^', a: base, b: unario() }; }
+    return base;
+  }
+  function primario() {
+    const tk = peek();
+    if (!tk) throw 0;
+    if (tk.t === 'num') { pos++; return { type: 'num', v: tk.v }; }
+    if (tk.t === 'id') { pos++; return { type: 'var', name: tk.v }; }
+    if (tk.t === 'fn') {
+      pos++;
+      let arg;
+      const t2 = peek();
+      if (t2 && t2.t === 'op' && t2.v === '(') { pos++; arg = expr(); espera(')'); }
+      else arg = unario();                        // permite "sin x"
+      return { type: 'call', fn: tk.v, a: arg };
+    }
+    if (tk.t === 'op' && tk.v === '(') { pos++; const n = expr(); espera(')'); return n; }
+    throw 0;
+  }
+  function espera(c) {
+    const tk = toks[pos++];
+    if (!tk || tk.t !== 'op' || tk.v !== c) throw 0;
+  }
+  const n = expr();
+  if (pos !== toks.length) throw 0;
+  return n;
+}
+
+function evalAst(n, x, V) {
+  switch (n.type) {
+    case 'num': return n.v;
+    case 'var':
+      if (n.name === 'x') return x;
+      if (n.name === 'e' && !('e' in V)) return Math.E;
+      return (n.name in V) ? V[n.name] : NaN;
+    case 'neg': return -evalAst(n.a, x, V);
+    case 'bin': {
+      const a = evalAst(n.a, x, V), b = evalAst(n.b, x, V);
+      switch (n.op) {
+        case '+': return a + b; case '-': return a - b;
+        case '*': return a * b; case '/': return a / b;
+        case '^': return Math.pow(a, b);
+      }
+      return NaN;
+    }
+    case 'call': {
+      const v = evalAst(n.a, x, V);
+      switch (n.fn) {
+        case 'sin': return Math.sin(v); case 'cos': return Math.cos(v);
+        case 'tan': return Math.tan(v); case 'sqrt': return Math.sqrt(v);
+        case 'ln': return Math.log(v); case 'log': return Math.log10(v);
+        case 'abs': return Math.abs(v);
+      }
+      return NaN;
+    }
+  }
+  return NaN;
+}
+
+function varsAst(n, acc = new Set()) {
+  if (!n) return acc;
+  if (n.type === 'var') acc.add(n.name);
+  if (n.a) varsAst(n.a, acc);
+  if (n.b) varsAst(n.b, acc);
+  return acc;
+}
+
+function texDe(s) {
+  return s.replace(/\b(sin|cos|tan|ln|log|abs|sqrt)\b/g, '\\$1')
+          .replace(/\^(\w+)/g, '^{$1}')
+          .replace(/\*/g, ' \\cdot ')
+          .replace(/π/g, '\\pi ')
+          .replace(/√/g, '\\sqrt ');
+}
+
+function interpretarEcuacion(bruto) {
+  const s = (bruto || '').replace(/\s+/g, '').replace(/−/g, '-').replace(/·/g, '*');
+  if (!s) return { tipo: 'error', msg: 'no hay ecuación' };
+  const i = s.indexOf('=');
+  try {
+    if (i >= 0) {
+      const izq = s.slice(0, i), der = s.slice(i + 1);
+      if (izq === 'y' || izq === 'Y' || izq === 'f(x)') {
+        const ast = parsear(tokenizar(der));
+        const vs = [...varsAst(ast)].filter(v => v !== 'x' && v !== 'e' && !(v in vars));
+        if (vs.length) return { tipo: 'error', msg: 'variable sin definir: ' + vs.join(', ') + ' (escríbela antes, ej. k=3)' };
+        return { tipo: 'func', ast, tex: texDe('y=' + der) };
+      }
+      if (/^[a-zA-Z]$/.test(izq) && izq !== 'x') {
+        const ast = parsear(tokenizar(der));
+        const vs = varsAst(ast);
+        if (vs.has('x')) return { tipo: 'error', msg: 'solo y=… puede depender de x' };
+        const faltan = [...vs].filter(v => v !== 'e' && !(v in vars));
+        if (faltan.length) return { tipo: 'error', msg: 'variable sin definir: ' + faltan.join(', ') };
+        const val = evalAst(ast, 0, vars);
+        if (!isFinite(val)) return { tipo: 'error', msg: 'valor no válido' };
+        return { tipo: 'asig', nombre: izq, valor: val, tex: texDe(s) };
+      }
+      return { tipo: 'error', msg: 'usa la forma y = expresión, o letra = número' };
+    }
+    const ast = parsear(tokenizar(s));
+    const vs = [...varsAst(ast)].filter(v => v !== 'x' && v !== 'e' && !(v in vars));
+    if (vs.length) return { tipo: 'error', msg: 'variable sin definir: ' + vs.join(', ') };
+    return { tipo: 'func', ast, tex: texDe('y=' + s) };
+  } catch (e) { return { tipo: 'error', msg: 'sintaxis no entendida — corrige el texto y reintenta' }; }
+}
+
+/* ---------- UI del reconocimiento ---------- */
+function actualizarBarra() {
+  $('barraRecon').hidden = !(reconActivo || $('txtRecon').textContent.trim().length > 0);
+}
+function actualizarVarsUI() {
+  const claves = Object.keys(vars);
+  $('varsRecon').textContent = claves.length
+    ? '📌 ' + claves.map(k => k + '=' + bonito(vars[k])).join(' · ') : '';
+}
+function addChipUsuario(c) {
+  const chip = document.createElement('span');
+  chip.className = 'chip usr';
+  chip.style.borderColor = c.color; chip.style.color = c.color;
+  const contenido = document.createElement('span');
+  poner(contenido, c.tex);
+  const x = document.createElement('button');
+  x.className = 'quitar'; x.textContent = '✕'; x.title = 'Quitar curva';
+  x.onclick = () => {
+    const i = curvasUsuario.indexOf(c);
+    if (i > -1) curvasUsuario.splice(i, 1);
+    chip.remove(); pedirRender();
+  };
+  chip.append(contenido, x);
+  $('chipsUsuario').appendChild(chip);
+}
+
+function graficar() {
+  const bruto = $('txtRecon').textContent;
+  const r = interpretarEcuacion(bruto);
+  if (r.tipo === 'error') { fb('⚠️ ' + r.msg); return; }
+  if (r.tipo === 'asig') {
+    vars[r.nombre] = r.valor;
+    fb('✅ ' + r.nombre + ' = ' + bonito(r.valor) + ' guardado · úsalo en otra ecuación');
+    actualizarVarsUI();
+  } else {
+    const color = COLORES_USUARIO[contadorCurvas++ % COLORES_USUARIO.length];
+    const c = { src: bruto.replace(/\s+/g, ''), tex: r.tex,
+                fn: x => evalAst(r.ast, x, vars), color };
+    curvasUsuario.push(c);
+    addChipUsuario(c);
+    fb('📈 ¡Ecuación graficada! Quita la curva con la ✕ de su etiqueta');
+  }
+  $('txtRecon').textContent = '';
+  actualizarBarra(); pedirRender();
+}
+
+ $('btnRecon').addEventListener('click', () => {
+  reconActivo = !reconActivo;
+  $('btnRecon').classList.toggle('activa', reconActivo);
+  if (reconActivo) fb('✍️ escribe la ecuación completa y haz una pausa de ~2 s');
+  else { clearTimeout(reconTimer); reconTimer = null; bufferRecon = []; }
+  actualizarBarra();
+});
+ $('btnGraficar').addEventListener('click', graficar);
+ $('txtRecon').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); graficar(); } });
+ $('btnReintentar').addEventListener('click', reconocerEcuacion);
+ $('btnDescartarBuf').addEventListener('click', () => {
+  bufferRecon.forEach(t => { const i = trazos.indexOf(t); if (i > -1) trazos.splice(i, 1); });
+  bufferRecon = []; fb('↺ trazos descartados'); pedirRender();
+});
+ $('btnLimpiarTxt').addEventListener('click', () => { $('txtRecon').textContent = ''; actualizarBarra(); });
+ $('btnInsertarTexto').addEventListener('click', () => {
+  const t = $('txtRecon').textContent.trim();
+  if (!t) return;
+  const pos = ultimaPos || { x: mX(80), y: mY(60) };
+  figuras.push({ tipo: 'texto', x: pos.x, y: pos.y, texto: t, color: tizaColor });
+  $('txtRecon').textContent = '';
+  fb('✅ insertado en la pizarra');
+  actualizarBarra(); pedirRender();
+});
+
+/* ==================== MODOS ==================== */
+const PISTAS = {
+  escritura: '✏️ Escribe ecuaciones o anota · Con 🔍 y 📈 se grafican',
+  funcion: '📈 Sliders para las curvas · Escribe más funciones con 🔍 en Escritura',
+  geom2d: '📐 Arrastra para dibujar · Cubo/Esfera 3D estilo tiza · Ángulo: 3 toques',
+  '3d': '🧊 Arrastra para rotar · Rueda o pellizco para acercar'
+};
+document.querySelectorAll('.modo').forEach(b =>
+  b.addEventListener('click', () => setModo(b.dataset.modo)));
+
+function setModo(m) {
+  modo = m; document.body.dataset.modo = m;
+  angTmp = null;
+  document.querySelectorAll('.modo').forEach(x => x.classList.toggle('activo', x.dataset.modo === m));
+  pista.textContent = PISTAS[m];
+  const es3d = m === '3d';
+  v3d.hidden = !es3d;
+  pizarra.style.display = es3d ? 'none' : 'block';
+  if (es3d) requestAnimationFrame(() => {
+    iniciar3D(); ajustar3D(); animar3D();
+    if (!window.THREE) pista.textContent = '⚠️ Sin conexión: no se pudo cargar el módulo 3D';
+  });
+  else pedirRender();
+}
+
+/* ==================== CONTROLES ==================== */
+function slider(idIn, idOut, fn) {
+  const s = $(idIn), v = $(idOut);
+  s.addEventListener('input', () => {
+    const x = parseFloat(s.value);
+    v.textContent = bonito(x); fn(x);
+    actualizarFormulas(); pedirRender();
+  });
+}
+slider('pa','va', x => fq.a = x);  slider('pb','vb', x => fq.b = x);
+slider('pc','vc', x => fq.c = x);  slider('pA','vA', x => fs.A = x);
+slider('pk','vk', x => fs.k = x);  slider('pB','vB', x => fs.B = x);
+slider('pEsc','vEsc', x => escala = x);
+ $('pGrosor').addEventListener('input', e => { grosor = +e.target.value; $('vGrosor').textContent = grosor; });
+
+ $('chkCuad').addEventListener('change', e => { fq.on = e.target.checked; $('chipCuad').classList.toggle('apagada', !fq.on); pedirRender(); });
+ $('chkSeno').addEventListener('change', e => { fs.on = e.target.checked; $('chipSeno').classList.toggle('apagada', !fs.on); pedirRender(); });
+ $('chkGrid').addEventListener('change', e => { cuadricula = e.target.checked; pedirRender(); });
+ $('chkSnap').addEventListener('change', e => snap = e.target.checked);
+
+document.querySelectorAll('.color').forEach(b => b.addEventListener('click', () => {
+  tizaColor = b.dataset.color;
+  document.querySelectorAll('.color').forEach(x => x.classList.toggle('activa', x.dataset.color === tizaColor));
+}));
+document.querySelectorAll('.herr').forEach(b => b.addEventListener('click', () => {
+  herr2d = b.dataset.herr; angTmp = null;
+  if (modo === 'geom2d') pista.textContent = PISTAS.geom2d;
+  document.querySelectorAll('.herr').forEach(x => x.classList.toggle('activa', x === b));
+  pedirRender();
+}));
+ $('btnGoma').addEventListener('click', () => {
+  herramienta = herramienta === 'goma' ? 'tiza' : 'goma';
+  $('btnGoma').classList.toggle('activa', herramienta === 'goma');
+});
+ $('btnDeshacer').addEventListener('click', () => { trazos.pop(); pedirRender(); });
+ $('btnDesFig').addEventListener('click', () => { figuras.pop(); pedirRender(); });
+ $('btnLimpiar').addEventListener('click', () => { trazos.length = 0; pedirRender(); });
+ $('btnLimFig').addEventListener('click', () => { figuras.length = 0; pedirRender(); });
+
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    (modo === 'geom2d' ? figuras : trazos).pop(); pedirRender();
+  }
+  if (e.key === 'Escape') {
+    angTmp = null;
+    if (modo === 'geom2d') pista.textContent = PISTAS.geom2d;
+    pedirRender();
+  }
+});
+
+/* ==================== GUARDAR / ABRIR CLASE ==================== */
+ $('btnGuardar').addEventListener('click', () => {
+  const estado = {
+    v: 3, escala, cuadricula,
+    fq: { a: fq.a, b: fq.b, c: fq.c, on: fq.on },
+    fs: { A: fs.A, k: fs.k, B: fs.B, on: fs.on },
+    vars: { ...vars },
+    curvas: curvasUsuario.map(c => c.src),
+    trazos, figuras
+  };
+  const blob = new Blob([JSON.stringify(estado)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'clase-pizarra.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+ $('btnAbrir').addEventListener('click', () => $('archivoClase').click());
+ $('archivoClase').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    try {
+      const st = JSON.parse(lector.result);
+      trazos.length = 0; trazos.push(...(st.trazos || []));
+      figuras.length = 0; figuras.push(...(st.figuras || []));
+      bufferRecon = []; angTmp = null;
+      curvasUsuario.length = 0; contadorCurvas = 0;
+      $('chipsUsuario').innerHTML = '';
+      vars = {};
+      Object.assign(vars, st.vars || {});
+      if (st.fq) Object.assign(fq, st.fq);
+      if (st.fs) Object.assign(fs, st.fs);
+      if (typeof st.escala === 'number') {
+        escala = st.escala; $('pEsc').value = escala; $('vEsc').textContent = bonito(escala);
+      }
+      if (typeof st.cuadricula === 'boolean') { cuadricula = st.cuadricula; $('chkGrid').checked = cuadricula; }
+      [['pa','va',fq.a],['pb','vb',fq.b],['pc','vc',fq.c],
+       ['pA','vA',fs.A],['pk','vk',fs.k],['pB','vB',fs.B]]
+        .forEach(([i, o, v]) => { $(i).value = v; $(o).textContent = bonito(v); });
+      $('chkCuad').checked = fq.on; $('chipCuad').classList.toggle('apagada', !fq.on);
+      $('chkSeno').checked = fs.on; $('chipSeno').classList.toggle('apagada', !fs.on);
+      (st.curvas || []).forEach(src => {
+        const r = interpretarEcuacion(src);
+        if (r.tipo === 'func') {
+          const color = COLORES_USUARIO[contadorCurvas++ % COLORES_USUARIO.length];
+          const c = { src, tex: r.tex, fn: x => evalAst(r.ast, x, vars), color };
+          curvasUsuario.push(c); addChipUsuario(c);
+        }
+      });
+      actualizarVarsUI(); actualizarFormulas(); pedirRender();
+      pista.textContent = '📂 Clase cargada ✔';
+    } catch (err) { alert('⚠️ El archivo no es una clase válida'); }
+  };
+  lector.readAsText(f);
+  e.target.value = '';
+});
+
+ $('btnPNG').addEventListener('click', () => {
+  let url;
+  if (modo === '3d' && tres.listo) {
+    tres.renderer.render(tres.escena, tres.camara);
+    url = tres.renderer.domElement.toDataURL('image/png');
+  } else url = pizarra.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url; a.download = 'pizarra.png'; a.click();
+});
+
+/* ==================== FÓRMULAS (KaTeX) ==================== */
+function texCuad() {
+  const { a, b, c } = fq;
+  const t = (v, s, primero) => {
+    if (cero(v)) return '';
+    const abs = Math.abs(v);
+    const num = (s && Math.abs(abs - 1) < 1e-9) ? '' : bonito(abs);
+    const cuerpo = num + s;
+    return primero ? (v < 0 ? '-' : '') + cuerpo : (v < 0 ? ' - ' : ' + ') + cuerpo;
+  };
+  return 'y = ' + (t(a, 'x^{2}', true) + t(b, 'x', cero(a)) + t(c, '', cero(a) && cero(b)) || '0');
+}
+function texSeno() {
+  const { A, k, B } = fs;
+  if (cero(A)) return 'y = 0';
+  const numA = Math.abs(Math.abs(A) - 1) < 1e-9 ? '' : bonito(Math.abs(A));
+  let s = (A < 0 ? '-' : '') + numA + '\\sin(';
+  s += cero(k) ? '0'
+      : (k < 0 ? '-' : '') + (Math.abs(Math.abs(k) - 1) < 1e-9 ? '' : bonito(Math.abs(k))) + 'x';
+  s += ')';
+  if (!cero(B)) s += B < 0 ? ' - ' + bonito(-B) : ' + ' + bonito(B);
+  return 'y = ' + s;
+}
+function poner(el, tex) {
+  if (window.katex) {
+    try { katex.render(tex, el, { throwOnError: true }); return; } catch (e) {}
+  }
+  el.textContent = tex.replace(/\\/g, '');
+}
+function actualizarFormulas() {
+  poner($('chipCuad'), texCuad());
+  poner($('chipSeno'), texSeno());
+}
+
+/* ==================== GEOMETRÍA 3D (Three.js) ==================== */
+const tres = { listo: false, autorot: false };
+const FIGS = {
+  cubo:      { color: 0xe67e22, geo: () => new THREE.BoxGeometry(2.2, 2.2, 2.2) },
+  prisma:    { color: 0xffa94d, geo: () => new THREE.BoxGeometry(2.8, 1.5, 2.0) },
+  esfera:    { color: 0x4da3ff, geo: () => new THREE.SphereGeometry(1.35, 36, 24) },
+  cono:      { color: 0x58d68d, geo: () => new THREE.ConeGeometry(1.3, 2.4, 36) },
+  cilindro:  { color: 0xb07de0, geo: () => new THREE.CylinderGeometry(1, 1, 2.3, 36) },
+  piramide:  { color: 0xf5d76e, geo: () => new THREE.ConeGeometry(1.5, 2.2, 4, 1) },
+  tetraedro: { color: 0x7ee8a2, geo: () => new THREE.ConeGeometry(1.5, 2.1, 3) },
+  toro:      { color: 0xff8fb1, geo: () => new THREE.TorusGeometry(1.05, .45, 18, 36) }
+};
+let fig3d = 'cubo';
+
+function iniciar3D() {
+  if (tres.listo || !window.THREE) return;
+  const escena = new THREE.Scene();
+  escena.background = new THREE.Color(0x1b3427);
+  const camara = new THREE.PerspectiveCamera(45, 1, .1, 100);
+  camara.position.set(4.5, 3.2, 7); camara.lookAt(0, 0, 0);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  v3d.appendChild(renderer.domElement);
+  escena.add(new THREE.AmbientLight(0xffffff, .55));
+  const luz = new THREE.DirectionalLight(0xffffff, .85); luz.position.set(5, 8, 6); escena.add(luz);
+  const suelo = new THREE.GridHelper(10, 10, 0x3f7157, 0x2d5743);
+  suelo.position.y = -1.4; escena.add(suelo);
+  const grupo = new THREE.Group(); escena.add(grupo);
+  Object.assign(tres, { listo: true, escena, camara, renderer, grupo });
+  construir3D();
+
+  const el = renderer.domElement;
+  let arr = null;
+  el.addEventListener('pointerdown', e => { arr = { x: e.clientX, y: e.clientY }; el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointermove', e => {
+    if (!arr) return;
+    grupo.rotation.y += (e.clientX - arr.x) * .008;
+    grupo.rotation.x += (e.clientY - arr.y) * .008;
+    arr = { x: e.clientX, y: e.clientY };
+  });
+  el.addEventListener('pointerup', () => arr = null);
+  el.addEventListener('pointercancel', () => arr = null);
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    camara.position.multiplyScalar(1 + Math.sign(e.deltaY) * .08);
+    camara.position.clampLength(3, 18); camara.lookAt(0, 0, 0);
+  }, { passive: false });
+  el.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+function construir3D() {
+  if (!tres.listo) return;
+  if (tres.malla) {
+    tres.grupo.remove(tres.malla, tres.aristas);
+    tres.malla.geometry.dispose(); tres.malla.material.dispose();
+    tres.aristas.geometry.dispose(); tres.aristas.material.dispose();
+  }
+  const def = FIGS[fig3d];
+  const malla = new THREE.Mesh(def.geo(),
+    new THREE.MeshStandardMaterial({ color: def.color, roughness: .45, metalness: .15, wireframe: $('chkWire').checked }));
+  const aristas = new THREE.LineSegments(new THREE.EdgesGeometry(def.geo(), 12),
+    new THREE.LineBasicMaterial({ color: 0xffffff }));
+  if (fig3d === 'toro') { malla.rotation.x = .7; aristas.rotation.x = .7; }
+  tres.grupo.add(malla, aristas);
+  tres.malla = malla; tres.aristas = aristas;
+}
+
+function ajustar3D() {
+  if (!tres.listo) return;
+  const w = v3d.clientWidth || 2, h = v3d.clientHeight || 2;
+  tres.renderer.setSize(w, h);
+  tres.camara.aspect = w / h; tres.camara.updateProjectionMatrix();
+}
+
+let animando = false;
+function animar3D() {
+  if (animando || !tres.listo) return;
+  animando = true;
+  const ciclo = () => {
+    if (modo !== '3d') { animando = false; return; }
+    if (tres.autorot) tres.grupo.rotation.y += .006;
+    tres.renderer.render(tres.escena, tres.camara);
+    requestAnimationFrame(ciclo);
+  };
+  requestAnimationFrame(ciclo);
+}
+
+document.querySelectorAll('.fig3d').forEach(b => b.addEventListener('click', () => {
+  fig3d = b.dataset.fig;
+  document.querySelectorAll('.fig3d').forEach(x => x.classList.toggle('activa', x === b));
+  construir3D();
+}));
+ $('chkWire').addEventListener('change', e => { if (tres.malla) tres.malla.material.wireframe = e.target.checked; });
+ $('chkRot').addEventListener('change', e => tres.autorot = e.target.checked);
+ $('btnReset3d').addEventListener('click', () => {
+  if (!tres.listo) return;
+  tres.grupo.rotation.set(0, 0, 0);
+  tres.camara.position.set(4.5, 3.2, 7); tres.camara.lookAt(0, 0, 0);
+});
+tres.autorot = $('chkRot').checked;
+
+/* ==================== INICIO ==================== */
+redimensionar();
+setModo('escritura');
+actualizarFormulas();
+actualizarVarsUI();
+pedirRender();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(pedirRender);
+})();
+</script>
+</body>
+</html>
